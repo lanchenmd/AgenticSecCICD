@@ -1,0 +1,98 @@
+Here's a comprehensive planning breakdown for this system, organized across phases:Here's the full project plan organized by phase:
+
+---
+
+## Phase 1 — Foundation & infrastructure (Week 1–2)
+
+**Goal**: Get the skeleton working end-to-end before any intelligent analysis.
+
+- Set up a mono-repo with a clear `agents/`, `pipeline/`, and `config/` structure
+- Choose your CI/CD platform (GitHub Actions is the natural pick — native YAML, good Python support, free runners)
+- Stand up a minimal orchestrator that can invoke sub-processes in parallel and collect their outputs
+- Establish shared agent communication schema (JSON payloads: `{agent, severity, finding, file, line, cve_id, remediation}`)
+- Wire a dummy pass-through pipeline that just prints "SAST: OK, SCA: OK, IaC: OK" — this proves the scaffolding works before real analysis
+
+---
+
+## Phase 2 — SAST agent (Week 3–4)
+
+**Goal**: Detect injection flaws and insecure API patterns in source code.
+
+- Integrate `Semgrep` as the static analysis engine (Python SDK available, highly configurable rules)
+- Write custom rules targeting: SQL injection, command injection, path traversal, hardcoded secrets, insecure `requests` calls (no TLS verify, `verify=False`), unsafe deserialization
+- Agent outputs structured findings with file path, line number, rule ID, and severity
+- Add a `--baseline` mode so it only reports *new* findings on a PR, not historical debt
+- Test on a deliberately vulnerable repo (DVWA or your own synthetic fixtures)
+
+---
+
+## Phase 3 — SCA agent (Week 5–6)
+
+**Goal**: CVE detection in open-source dependencies + automated fix PRs.
+
+- Parse `requirements.txt`, `package.json`, `go.mod`, `Cargo.toml` depending on project type
+- Query the **OSV API** (Google's open-source vulnerability database — free, comprehensive) for each dependency version
+- Filter by exploitability: CVSS ≥ 7.0 blocks the pipeline; lower scores warn only
+- Auto-generate remediation PRs using the GitHub API: bump the version in the manifest, open a PR with a description citing the CVE ID, affected version range, and patched version
+- Handle transitive dependencies (use `pip-audit` or `safety` as a supplement for Python)
+
+---
+
+## Phase 4 — IaC agent (Week 7–8)
+
+**Goal**: Catch Terraform and Kubernetes misconfigurations before they reach production.
+
+- Use `Checkov` (Python-native, covers Terraform, K8s, Helm, Dockerfile) as the scanning engine
+- Key checks: public S3 buckets, unrestricted security groups, root containers, missing resource limits, missing network policies, cleartext secrets in env vars, missing pod security context
+- Parse Checkov's JSON output into the shared finding schema
+- Scope scans to changed IaC files only (via `git diff`) to keep runtime low
+
+---
+
+## Phase 5 — Cross-agent triage (Week 9–10)
+
+**Goal**: Reason across all three agents' outputs to produce a unified, prioritized risk verdict.
+
+- Build a triage module that ingests all findings and applies correlation logic: e.g., an insecure API pattern (SAST) + an exploitable dependency in that same service (SCA) + a public-facing K8s ingress (IaC) = critical combined risk, even if each alone is medium
+- Use an LLM call (Claude API) to narrate the combined risk: "Service X has SQL injection risk on line 47, runs on a vulnerable `requests` 2.26.0, and is exposed on a public ingress with no network policy — this is a high-priority attack surface."
+- Output a ranked finding list, a deployment verdict (`PASS` / `WARN` / `BLOCK`), and a human-readable summary for the PR comment
+
+---
+
+## Phase 6 — Quality gate & reporting (Week 11–12)
+
+**Goal**: Gate every production deployment and surface results clearly.
+
+- Hard block on: any CRITICAL finding, any CVE with CVSS ≥ 9.0, any publicly-exposed misconfiguration
+- Soft warn on: MEDIUM findings, CVSS 7–9 CVEs (annotate the PR but allow with approval)
+- Post a structured GitHub PR comment: finding table + LLM-generated summary + links to remediation PRs
+- Emit a SARIF file so findings appear natively in GitHub's Security tab
+- Store finding history in a simple SQLite or JSON file for trend tracking over time
+
+---
+
+## Key technical decisions
+
+| Decision | Recommendation | Rationale |
+|---|---|---|
+| Orchestration | GitHub Actions matrix jobs | Runs agents in parallel natively |
+| SAST engine | Semgrep | Python SDK, custom rule support |
+| SCA data | OSV API + pip-audit | Free, comprehensive, transitive deps |
+| IaC scanner | Checkov | Broad coverage, JSON output, Python |
+| Triage LLM | Claude API (Sonnet) | Contextual reasoning across agents |
+| PR automation | PyGithub | Simple, well-documented |
+
+---
+
+## Rough timeline
+
+```
+Weeks 1–2   Foundation & orchestrator skeleton
+Weeks 3–4   SAST agent
+Weeks 5–6   SCA agent + remediation PRs
+Weeks 7–8   IaC agent
+Weeks 9–10  Cross-agent triage + LLM reasoning
+Weeks 11–12 Quality gate, reporting, hardening
+```
+
+Want me to go deeper on any specific phase — code structure, the cross-agent triage logic, or the LLM prompt design for exploitability reasoning?

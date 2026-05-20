@@ -1,0 +1,107 @@
+name: Security Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  sast:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run SAST
+        run: python -m agents.dummy --agent sast
+      - name: Upload findings
+        uses: actions/upload-artifact@v4
+        with:
+          name: sast-findings
+          path: findings.json
+
+  sca:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run SCA
+        run: python -m agents.dummy --agent sca
+      - name: Upload findings
+        uses: actions/upload-artifact@v4
+        with:
+          name: sca-findings
+          path: findings.json
+
+  iac:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run IaC
+        run: python -m agents.dummy --agent iac
+      - name: Upload findings
+        uses: actions/upload-artifact@v4
+        with:
+          name: iac-findings
+          path: findings.json
+
+  aggregate:
+    needs: [sast, sca, iac]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: findings
+      - name: Aggregate findings
+        run: |
+          python -c "
+          import json
+          import os
+          findings = []
+          for root, dirs, files in os.walk('findings'):
+              for f in files:
+                  if f.endswith('.json'):
+                      with open(os.path.join(root, f)) as fp:
+                          findings.extend(json.load(fp))
+          with open('results.json', 'w') as fp:
+              json.dump(findings, fp)
+          "
+      - name: Generate SARIF
+        run: |
+          python -c "
+          import json
+          from pipeline.aggregate import generate_sarif
+          with open('results.json') as f:
+              findings = json.load(f)
+          sarif = generate_sarif(findings)
+          with open('results.sarif', 'w') as f:
+              json.dump(sarif, f, indent=2)
+          "
+      - name: Upload SARIF results
+        uses: actions/upload-sarif@v3
+        with:
+          sarif_file: results.sarif

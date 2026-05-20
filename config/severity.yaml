@@ -1,0 +1,9 @@
+severity_levels:
+  CRITICAL: 1
+  HIGH: 2
+  MEDIUM: 3
+  LOW: 4
+  INFO: 5
+
+block_threshold: "HIGH"
+warn_threshold: "MEDIUM"

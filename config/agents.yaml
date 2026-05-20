@@ -1,0 +1,15 @@
+sast:
+  enabled: true
+  tool: "semgrep"
+  rules: ["auto", "security"]
+  baseline: true
+
+sca:
+  enabled: true
+  min_cvss: 7.0
+  tools: ["osv", "pip-audit"]
+
+iac:
+  enabled: true
+  tool: "checkov"
+  scan_changed_only: true
