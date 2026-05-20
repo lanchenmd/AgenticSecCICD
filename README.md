@@ -17,6 +17,8 @@ This project implements a multi-agent security scanning pipeline that runs in Gi
 | 5 | Triage | LLM-powered cross-agent correlation |
 | 6 | Quality Gate | SARIF reporting, deployment blocking |
 
+Full phase details are documented in `plan.txt`.
+
 ## Project Structure
 
 ```
