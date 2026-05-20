@@ -18,7 +18,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Run SAST
-        run: python -m agents.dummy --agent sast
+        run: python -m agents.dummy --agent sast > findings.json
       - name: Upload findings
         uses: actions/upload-artifact@v4
         with:
@@ -36,7 +36,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Run SCA
-        run: python -m agents.dummy --agent sca
+        run: python -m agents.dummy --agent sca > findings.json
       - name: Upload findings
         uses: actions/upload-artifact@v4
         with:
@@ -54,7 +54,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Run IaC
-        run: python -m agents.dummy --agent iac
+        run: python -m agents.dummy --agent iac > findings.json
       - name: Upload findings
         uses: actions/upload-artifact@v4
         with:
@@ -102,6 +102,6 @@ jobs:
               json.dump(sarif, f, indent=2)
           "
       - name: Upload SARIF results
-        uses: actions/upload-sarif@v3
+        uses: github/sarif-upload-action@v0
         with:
           sarif_file: results.sarif
